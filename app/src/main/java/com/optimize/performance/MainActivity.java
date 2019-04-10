@@ -3,15 +3,21 @@ package com.optimize.performance;
 import android.annotation.TargetApi;
 import android.app.job.JobInfo;
 import android.app.job.JobScheduler;
+import android.app.usage.NetworkStats;
+import android.app.usage.NetworkStatsManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.net.NetworkCapabilities;
 import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Process;
+import android.os.RemoteException;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.view.AsyncLayoutInflater;
@@ -19,6 +25,7 @@ import android.support.v4.view.LayoutInflaterCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -27,7 +34,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.AlphaAnimation;
-
 import com.alibaba.fastjson.JSON;
 import com.optimize.performance.adapter.NewsAdapter;
 import com.optimize.performance.adapter.OnFeedShowCallBack;
@@ -43,14 +49,14 @@ import com.optimize.performance.utils.LaunchTimer;
 import com.optimize.performance.utils.LogUtils;
 import com.zhangyue.we.x2c.X2C;
 import com.zhangyue.we.x2c.ano.Xml;
-
-import org.json.JSONObject;
-
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Iterator;
 import java.util.List;
-
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import okhttp3.ResponseBody;
+import org.json.JSONObject;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -141,7 +147,7 @@ public class MainActivity extends AppCompatActivity implements OnFeedShowCallBac
         filter.addAction(Intent.ACTION_BATTERY_CHANGED);
         Intent intent = registerReceiver(null, filter);
         LogUtils.i("battery " + intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1));
-
+        loadNetDataInfo();
         getNews();
         getFPS();
 
@@ -160,6 +166,18 @@ public class MainActivity extends AppCompatActivity implements OnFeedShowCallBac
         } else {
             ExceptionMonitor.monitor("");
         }
+    }
+
+    private void loadNetDataInfo() {
+        //获取一个月的
+        getNetStates(getTimesMonthMorning(),System.currentTimeMillis());
+        // 精确统计前后台
+        Executors.newScheduledThreadPool(1).schedule(new Runnable() {
+            @Override public void run() {
+                long mNetUse = getNetStates(System.currentTimeMillis() - 30 * 1000,
+                    System.currentTimeMillis());
+            }
+        },30, TimeUnit.SECONDS);
     }
 
     /**
@@ -240,6 +258,55 @@ public class MainActivity extends AppCompatActivity implements OnFeedShowCallBac
         super.onPause();
         // 以下代码是为了演示电量优化中对动画的处理
 //        alphaAnimation.cancel();
+    }
+    private long getNetStates(long start,long end){
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M){
+            return 0;
+        }
+        long netDataRx =0;//接受
+        long netDataTx = 0; //发送
+        TelephonyManager mTelephonyManager = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
+        String subId = mTelephonyManager.getSubscriberId();
+        NetworkStatsManager networkStatsManager = (NetworkStatsManager) getSystemService(NETWORK_STATS_SERVICE);
+        NetworkStats.Bucket summaryBucket = new NetworkStats.Bucket();
+        long summaryTotal = 0;
+        try {
+            NetworkStats summaryStats =
+                networkStatsManager.querySummary(NetworkCapabilities.TRANSPORT_WIFI, subId, start, end);
+            do {
+                summaryStats.getNextBucket(summaryBucket);
+                int summaryUid = summaryBucket.getUid();
+                if (getUidByPackageName(MainActivity.this,"packageName") == summaryUid) {
+                    netDataRx += summaryBucket.getRxBytes();
+                    netDataTx += summaryBucket.getTxBytes();
+                }
+                summaryTotal += summaryBucket.getRxBytes() + summaryBucket.getTxBytes();
+            } while (summaryStats.hasNextBucket());
+        } catch (RemoteException mE) {
+            mE.printStackTrace();
+        }
+        return summaryTotal;
+    }
+    public static long getTimesMonthMorning() {
+        Calendar cal = Calendar.getInstance();
+        cal.set(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH), 0, 0, 0);
+        cal.set(Calendar.DAY_OF_MONTH, cal.getActualMinimum(Calendar.DAY_OF_MONTH));
+        return cal.getTimeInMillis();
+    }
+    public static int getUidByPackageName(Context context, String packageName) {
+        int uid = -1;
+        PackageManager packageManager = context.getPackageManager();
+        try {
+            PackageInfo packageInfo = packageManager.getPackageInfo(packageName, PackageManager.GET_META_DATA);
+
+            uid = packageInfo.applicationInfo.uid;
+            Log.i(MainActivity.class.getSimpleName(), packageInfo.packageName + " uid:" + uid);
+
+
+        } catch (PackageManager.NameNotFoundException e) {
+        }
+
+        return uid;
     }
 
     @Override
