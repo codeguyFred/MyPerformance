@@ -147,7 +147,7 @@ public class MainActivity extends AppCompatActivity implements OnFeedShowCallBac
         filter.addAction(Intent.ACTION_BATTERY_CHANGED);
         Intent intent = registerReceiver(null, filter);
         LogUtils.i("battery " + intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1));
-        loadNetDataInfo();
+//        loadNetDataInfo();
         getNews();
         getFPS();
 
@@ -265,6 +265,7 @@ public class MainActivity extends AppCompatActivity implements OnFeedShowCallBac
         }
         long netDataRx =0;//接受
         long netDataTx = 0; //发送
+        //需要检查权限
         TelephonyManager mTelephonyManager = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
         String subId = mTelephonyManager.getSubscriberId();
         NetworkStatsManager networkStatsManager = (NetworkStatsManager) getSystemService(NETWORK_STATS_SERVICE);

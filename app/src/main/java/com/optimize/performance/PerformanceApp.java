@@ -97,14 +97,14 @@ public class PerformanceApp extends Application {
 
         LaunchTimer.startRecord();
         MultiDex.install(this);
-        DexposedBridge.hookAllConstructors(Thread.class, new XC_MethodHook() {
+        /*DexposedBridge.hookAllConstructors(Thread.class, new XC_MethodHook() {
             @Override
             protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                 super.afterHookedMethod(param);
                 Thread thread = (Thread) param.thisObject;
                 LogUtils.i(thread.getName()+" stack "+Log.getStackTraceString(new Throwable()));
             }
-        });
+        });*/
     }
 
     @Override
@@ -126,7 +126,7 @@ public class PerformanceApp extends Application {
 
         dispatcher.addTask(new InitAMapTask())
                 .addTask(new InitStethoTask())
-                .addTask(new InitWeexTask())
+//                .addTask(new InitWeexTask())
                 .addTask(new InitBuglyTask())
                 .addTask(new InitFrescoTask())
                 .addTask(new InitJPushTask())
@@ -138,13 +138,13 @@ public class PerformanceApp extends Application {
 
         LaunchTimer.endRecord();
 
-        DexposedBridge.hookAllConstructors(ImageView.class, new XC_MethodHook() {
+        /*DexposedBridge.hookAllConstructors(ImageView.class, new XC_MethodHook() {
             @Override
             protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                 super.afterHookedMethod(param);
                 DexposedBridge.findAndHookMethod(ImageView.class, "setImageBitmap", Bitmap.class, new ImageHook());
             }
-        });
+        });*/
 
 
 //        try {
